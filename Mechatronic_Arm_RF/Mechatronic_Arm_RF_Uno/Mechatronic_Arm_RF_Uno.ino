@@ -15,8 +15,12 @@
 ///////////////////////////////////////////////////////////////////////////////
 //Libraries
 #include <Servo.h>  //Servo library
-#include <Wire.h>   //I2C library
-#include <I2C_Anything.h>
+#include <SPI.h>
+#include <EEPROM.h>
+//#include <ServoTimer2.h>
+#include "nRF24L01.h"
+#include "RF24.h"
+#include "printf.h"
 
 // Servos array in order from bottom of the arm up
 // shoulderRotate : Servo 1 - motor[0]
@@ -31,28 +35,45 @@ Servo motor[6];
 long rd[6];
 int p = 0;
 long rec = 0;
+//ServoTimer2 fmotor;
+
+RF24 radio(2,10);
+
+const uint64_t pipe = 0xE8E8F0F0E1LL;
+
+typedef struct{
+  long shoulderRotate;
+  long shoulderBend;
+  long elbow;
+  long wristBend;
+  long wristRotate;
+  long grippr;
+}
+A_t;
+A_t positions;
 ///////////////////////////////////////////////////////////////////////////////
 
 void setup()
 {
-  //I2C setup
-  Wire.begin(30);    //join I2C bus with address #30 
-  Wire.onReceive(receiveEvent); //register event
+  
   Serial.begin(9600);
   
+  radio.begin();
+  radio.setDataRate(RF24_2MBPS); // Both endpoints must have this set the same
+  radio.setAutoAck(false);
+  //radio.printDetails();
+  radio.openReadingPipe(1,pipe);
+  radio.startListening();
+  
   //Connect servos to pwm pins
-  motor[0].attach(11);
-  motor[1].attach(10);
+  //motor[0].attach(13);
+  //fmotor.attach(4);
+  //motor[1].attach(11);
   motor[2].attach(9);
   motor[3].attach(6);
   motor[4].attach(5);
   motor[5].attach(3);
   
-  //I2C
-// for (int n = 0; n < 6; n++)
-// {
-//   rd[n] = 90;
-// }
   rd[0] = 90;
   rd[1] = 90;
   rd[2] = 100;
@@ -60,8 +81,7 @@ void setup()
   rd[4] = 90;
   rd[5] = 45;
  //initiate array at resting position in case comm does
-                           //not start right away
- long rec = 0;  
+                           //not start right away 
                          
 }
 
@@ -71,32 +91,23 @@ void loop()
 {
   
 //Loops through each servo reading (except the gripper which is handled digitally)
-Wire.requestFrom(30,44);
-  for (int k = 0; k < 6; k++) {
-    motor[k].write(rd[k]);
+
+Serial.println("hfhfhf");
+  if ( radio.available() ) {
+    radio.read(&positions, sizeof(positions));
+    Serial.println("got it mang");
+    Serial.println(positions.elbow);
+    //motor[0].write(positions.shoulderRotate);
+    //motor[0].write(0);
+    //fmotor.write(positions.shoulderRotate);
+    //motor[1].write(positions.shoulderBend);
+    motor[2].write(positions.elbow);
+    motor[3].write(positions.wristBend);
+    motor[4].write(positions.wristRotate);
+    motor[5].write(positions.grippr);
+    
   }
-  delay(15);
-  Serial.println(rd[0]);
-  Serial.println(rd[1]);
-  Serial.println(rd[2]);
-  Serial.println(rd[3]);
-  Serial.println(rd[4]);
-  Serial.println(rd[5]);
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-void receiveEvent(int howMany)
-{
-  p=0; //counting variable
-  I2C_readAnything(rec);
-  Serial.print("poop");
-  Serial.print(rec);
-//  while(Wire.available() > 0)
-//  {
-//    rd[p] = Wire.read();
-//    p = p+1;
-//  }
-  // intended to recieve an array indicating the positions of the servos
-  
-}
